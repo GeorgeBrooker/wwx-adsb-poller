@@ -9,6 +9,7 @@ mod data_model;
 mod helpers;
 mod poll_worker;
 mod upstreams;
+mod local_server;
 
 #[derive(Parser, Debug)]
 struct Cli {
@@ -32,7 +33,7 @@ fn main() {
     let refresh_rate = args.refresh_rate.clone();
     let poll_timeout = 15; // seconds
     let idle_timout = refresh_rate * 4; // server will kill itself after 4 missing polls
-
+    let local_server_address = "127.0.0.1:35535";
     // state will store the master table of collected api data
     let state = Arc::new(SharedState {
         latest_data: RwLock::new(HashMap::new()),
@@ -57,10 +58,12 @@ fn main() {
 
     // Start the API poller
     spawn_poll_worker(
-        state,
+        state.clone(),
         upstream_maps,
         Duration::from_mins(refresh_rate),
         Duration::from_secs(poll_timeout),
         Duration::from_mins(idle_timout)
     );
+
+    local_server::serve(state, local_server_address);
 }

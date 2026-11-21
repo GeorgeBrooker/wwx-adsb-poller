@@ -1,3 +1,66 @@
+use std::{
+    collections::HashMap, sync::{Arc, RwLock}, time::{Duration, Instant}
+};
+use clap::{Args, Parser};
+use crate::{
+    poll_worker::{SharedState, spawn_poll_worker}, upstreams::{AdsbUpstream, UpstreamSource}
+};
+mod data_model;
+mod helpers;
+mod poll_worker;
+mod upstreams;
+
+#[derive(Parser, Debug)]
+struct Cli {
+    #[command(flatten)]
+    adsb: Option<AdsbArgs>,
+    #[arg(long, value_parser = clap::value_parser!(u8).range(1..=30), default_value_t=5)]
+    refresh_rate: u64,
+}
+#[derive(Args, Debug)]
+#[group(requires_all = ["adsb_lat", "adsb_lon", "adsb_range"])]
+struct AdsbArgs {
+    #[arg(long)]
+    adsb_lat: f64,
+    #[arg(long)]
+    adsb_lon: f64,
+    #[arg(long, value_parser = clap::value_parser!(u8).range(1..=250))]
+    adsb_range: u8,
+}
 fn main() {
-    println!("Hello, world!");
+    let args = Cli::parse();
+    let refresh_rate = args.refresh_rate.clone();
+    let poll_timeout = 15; // seconds
+    let idle_timout = refresh_rate * 4; // server will kill itself after 4 missing polls
+
+    // state will store the master table of collected api data
+    let state = Arc::new(SharedState {
+        latest_data: RwLock::new(HashMap::new()),
+        last_local_ping: RwLock::new(Instant::now()),
+    });
+    let mut upstream_maps = HashMap::new();
+
+    // Build the api polling table
+    if let Some(ref adsb) = args.adsb {
+        let lat = adsb.adsb_lat;
+        let lon = adsb.adsb_lon;
+        let range = adsb.adsb_range;
+
+        let url: String = format!("https://opendata.adsb.fi/api/v3/lat/{lat}/lon/{lon}/dist/{range}");
+        upstream_maps.insert(
+            "adsb".to_owned(),
+            Box::new(AdsbUpstream {
+                url: url.to_owned(),
+            }) as Box<dyn UpstreamSource>,
+        );
+    }
+
+    // Start the API poller
+    spawn_poll_worker(
+        state,
+        upstream_maps,
+        Duration::from_mins(refresh_rate),
+        Duration::from_secs(poll_timeout),
+        Duration::from_mins(idle_timout)
+    );
 }

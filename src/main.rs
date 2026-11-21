@@ -15,7 +15,7 @@ mod local_server;
 struct Cli {
     #[command(flatten)]
     adsb: Option<AdsbArgs>,
-    #[arg(long, value_parser = clap::value_parser!(u8).range(1..=30), default_value_t=5)]
+    #[arg(long, value_parser = clap::value_parser!(u64).range(1..=30), default_value_t=5)]
     refresh_rate: u64,
 }
 #[derive(Args, Debug)]

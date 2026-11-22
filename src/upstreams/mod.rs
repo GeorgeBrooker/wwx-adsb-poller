@@ -1,4 +1,5 @@
 pub mod adsb;
+pub mod adsb_db;
 pub use adsb::AdsbUpstream;
 
 use crate::data_model::ProcessedApiData;

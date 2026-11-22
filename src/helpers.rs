@@ -26,7 +26,7 @@ pub(crate) fn get_icao_for_adsb(items: &[ProcessedApiData], state:Arc<SharedStat
                     records.iter().any(|record: &ProcessedApiData| {
                         record
                             .as_icao()
-                            .is_some_and(|icao| icao.callsign == aircraft.callsign && icao.registration == aircraft.registration) 
+                            .is_some_and(|icao| icao.callsign == aircraft.callsign) 
                     })
                 })
                 .unwrap_or(false)
@@ -34,9 +34,8 @@ pub(crate) fn get_icao_for_adsb(items: &[ProcessedApiData], state:Arc<SharedStat
         if cached {
             continue;
         }
-        let registration = &aircraft.registration;
         let callsign = &aircraft.callsign;
-        let lookup_url = format!("https://api.adsbdb.com/v0/aircraft/{registration}?callsign={callsign}");
+        let lookup_url = format!("https://api.adsbdb.com/v0/callsign/{callsign}");
         let endpoint = IcaoUpstream {url: lookup_url};
         match endpoint.poll(&agent) {
             Ok(mut icao_data) => icao_cache_additions.append(&mut icao_data),

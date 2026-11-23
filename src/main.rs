@@ -15,16 +15,23 @@ mod local_server;
 struct Cli {
     #[command(flatten)]
     adsb: Option<AdsbArgs>,
+    /// Remove any aircraft going to or from these airports; comma seperated ICAO codes
+    #[arg(long, value_delimiter = ',')]
+    removed_airports: Vec<String>,
+    /// Refresh rate in seconds, accepts decimal values.
     #[arg(long, value_parser = clap::value_parser!(f64), default_value_t=5.0)]
     refresh_rate: f64,
 }
 #[derive(Args, Debug)]
 #[group(requires_all = ["adsb_lat", "adsb_lon", "adsb_range"])]
 struct AdsbArgs {
+    /// Decimal lattitude of lookup point
     #[arg(long)]
     adsb_lat: f64,
+    /// Decimal longditude of lookup point
     #[arg(long)]
     adsb_lon: f64,
+    /// Range of ADSB lookup in nautical miles
     #[arg(long, value_parser = clap::value_parser!(u8).range(1..=250))]
     adsb_range: u8,
 }
@@ -32,6 +39,7 @@ fn main() {
     let args = Cli::parse();
     const ICAO_CACHE_TTL: u64 = 4;
     const ICAO_MISS_TTL: u64 = 2;
+    let removed_airports = args.removed_airports.clone(); // take this as a CLI argument as this is designed to be tightly coupled to one miz at a time. We want to do as much processing in rust as possible
     let refresh_rate = args.refresh_rate.clone();
     let poll_timeout = 15; // seconds
     let idle_timout = refresh_rate * 4.0; // server will kill itself after 4 missing polls
@@ -72,5 +80,5 @@ fn main() {
         Duration::from_hours(ICAO_MISS_TTL)
     );
 
-    local_server::serve(state, local_server_address);
+    local_server::serve(state, local_server_address, &removed_airports);
 }

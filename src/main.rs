@@ -31,6 +31,7 @@ struct AdsbArgs {
 fn main() {
     let args = Cli::parse();
     const ICAO_CACHE_TTL: u64 = 4;
+    const ICAO_MISS_TTL: u64 = 2;
     let refresh_rate = args.refresh_rate.clone();
     let poll_timeout = 15; // seconds
     let idle_timout = refresh_rate * 4; // server will kill itself after 4 missing polls
@@ -38,6 +39,7 @@ fn main() {
 
     // state will store the master table of collected api data
     let state = Arc::new(SharedState {
+        icao_cache: RwLock::new(HashMap::new()),
         latest_data: RwLock::new(HashMap::new()),
         last_local_ping: RwLock::new(Instant::now()),
     });
@@ -65,7 +67,8 @@ fn main() {
         Duration::from_mins(refresh_rate),
         Duration::from_secs(poll_timeout),
         Duration::from_mins(idle_timout),
-        Duration::from_hours(ICAO_CACHE_TTL)
+        Duration::from_hours(ICAO_CACHE_TTL),
+        Duration::from_hours(ICAO_MISS_TTL)
     );
 
     local_server::serve(state, local_server_address);

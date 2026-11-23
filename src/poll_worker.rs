@@ -1,10 +1,11 @@
 use crate::{
-    data_model::ProcessedApiData::{self, Icao}, helpers::get_icao_for_adsb, upstreams::{UpstreamSource, adsb::ADSB_CACHE_KEY, adsb_db::ICAO_CACHE_KEY}
+    data_model::ProcessedApiData::{self, Icao}, helpers::get_icao_for_adsb, upstreams::{UpstreamSource, adsb::ADSB_CACHE_KEY, adsb_db::IcaoCacheEntry}
 };
 use std::{
     collections::HashMap, ops::ControlFlow::Continue, sync::{Arc, RwLock}, thread::{self, JoinHandle}, time::{Duration, Instant},
 };
 pub struct SharedState {
+    pub icao_cache: RwLock<HashMap<String, IcaoCacheEntry>>,
     pub latest_data: RwLock<HashMap<String, Vec<ProcessedApiData>>>,
     pub last_local_ping: RwLock<Instant>,
 }
@@ -16,6 +17,7 @@ pub fn spawn_poll_worker(
     poll_timout: Duration,
     idle_timeout: Duration, // time from last DCS request to activate dead man switch
     icao_cache_period: Duration,
+    icao_miss_period: Duration,
 ) -> JoinHandle<()> {
     thread::spawn(move || {
         //Share one agent across all upstreams
@@ -30,17 +32,12 @@ pub fn spawn_poll_worker(
                 std::process::exit(0);
             }
             // ICAO cache validity check
-            let mut latest_data = state.latest_data.write().unwrap();
-            let icao_cache = latest_data
-                .entry(ICAO_CACHE_KEY.to_owned())
-                .or_default();
-            icao_cache.retain(|entry|{
-                match entry.as_icao() {
-                    Some(icao) => icao.lookup_time.elapsed() < icao_cache_period,
-                    None => false,
-                }
+            let mut icao_cache = state.icao_cache.write().unwrap();
+            icao_cache.retain(|_, entry|{
+                let ttl = if entry.route.is_some() { icao_cache_period } else { icao_miss_period };
+                entry.lookup_time.elapsed() < ttl
             });
-            drop(latest_data); // Release lock
+            drop(icao_cache); // Release lock
 
             // Poll APIs
             for (name, source) in &upstreams {
@@ -53,15 +50,11 @@ pub fn spawn_poll_worker(
                                 &agent
                             ).unwrap_or_else(|error| {
                                 eprintln!("[Poller] ICAO lookup failed: '{error}'");
-                                Vec::new()
+                                HashMap::new()
                             });
 
-                            let mut latest_data = state.latest_data.write().unwrap();
-                            latest_data // Icao Cache update
-                                .entry(ICAO_CACHE_KEY.to_owned())
-                                .or_default()
-                                .extend(icao_additions); // Polled API update
-                            latest_data.insert(name.clone(), items);
+                            state.icao_cache.write().unwrap().extend(icao_additions);
+                            state.latest_data.write().unwrap().insert(name.clone(), items);
                         } else {
                             let mut latest_data = state.latest_data.write().unwrap();
                             latest_data.insert(name.clone(), items);

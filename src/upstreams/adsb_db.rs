@@ -3,8 +3,6 @@ use super::UpstreamSource;
 use serde::{Deserialize, Serialize};
 use crate::data_model::ProcessedApiData;
 
-pub const ICAO_CACHE_KEY: &str = "icao";
-
 #[derive(Debug, Deserialize)]
 pub struct AircraftAndCallsign {
     pub flightroute: Option<FlightRoute>
@@ -32,12 +30,21 @@ pub struct FlightDestination {
     icao_code: Option<String>
 }
 #[derive(Debug, Serialize, Clone)]
+pub struct IcaoCacheEntry {
+    pub route: Option<ProcessedIcaoLookup>,
+    #[serde(skip)] // Only for internal cache management
+    pub lookup_time: Instant
+}
+impl IcaoCacheEntry {
+    pub fn new(route: Option<ProcessedIcaoLookup>) -> Self {
+        Self { route, lookup_time: Instant::now() }
+    }
+}
+#[derive(Debug, Serialize, Clone)]
 pub struct ProcessedIcaoLookup {
     pub callsign: String,
     pub origin: String,
     pub destination: String,
-    #[serde(skip)] // Only for internal cache management
-    pub lookup_time: Instant
 }
 impl From<AircraftAndCallsign> for Option<ProcessedIcaoLookup> {
     fn from(raw_ac: AircraftAndCallsign) -> Self {
@@ -49,8 +56,7 @@ impl From<AircraftAndCallsign> for Option<ProcessedIcaoLookup> {
         Some(ProcessedIcaoLookup {
             callsign: callsign,
             origin: origin.icao_code?,
-            destination: destination.icao_code?,
-            lookup_time: Instant::now()
+            destination: destination.icao_code?
         })
     }
 }

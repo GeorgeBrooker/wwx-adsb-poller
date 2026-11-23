@@ -39,7 +39,8 @@ fn main() {
     let args = Cli::parse();
     const ICAO_CACHE_TTL: u64 = 4;
     const ICAO_MISS_TTL: u64 = 2;
-    let removed_airports = args.removed_airports.clone(); // take this as a CLI argument as this is designed to be tightly coupled to one miz at a time. We want to do as much processing in rust as possible
+    let mut removed_airports = args.removed_airports.clone(); // take this as a CLI argument as this is designed to be tightly coupled to one miz at a time. We want to do as much processing in rust as possible
+    removed_airports.iter_mut().for_each(|airport| {*airport = airport.trim().to_ascii_uppercase()});
     let refresh_rate = args.refresh_rate.clone();
     let poll_timeout = 15; // seconds
     let idle_timout = refresh_rate * 4.0; // server will kill itself after 4 missing polls

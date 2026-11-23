@@ -64,8 +64,8 @@ impl From<AircraftAndCallsign> for Option<ProcessedIcaoLookup> {
 
         Some(ProcessedIcaoLookup {
             callsign: callsign,
-            origin: origin.icao_code?,
-            destination: destination.icao_code?
+            origin: origin.icao_code?.to_ascii_uppercase(),
+            destination: destination.icao_code?.to_ascii_uppercase()
         })
     }
 }

@@ -1,4 +1,4 @@
-use std::{env, time::Instant};
+use std::time::Instant;
 use super::UpstreamSource;
 use serde::{Deserialize, Serialize};
 use crate::data_model::ProcessedApiData;

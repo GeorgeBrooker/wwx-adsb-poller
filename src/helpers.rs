@@ -33,10 +33,11 @@ pub(crate) fn get_icao_for_adsb(items: &[ProcessedApiData], state:Arc<SharedStat
     std::thread::scope(|scope| {
         for aircraft in lookups {
             let sender = sender.clone();
+            let state = state.clone();
             scope.spawn(move || {
                 let lookup_url = format!("https://api.adsbdb.com/v0/callsign/{}", aircraft.callsign);
                 let upstream = IcaoUpstream{url: lookup_url};
-                let result = upstream.poll(&agent);
+                let result = upstream.poll(&agent, &state.api_calls, crate::upstreams::ICAO_ENDPOINT);
                 sender.send((aircraft.callsign, result))
                     .expect("Lookup receiver was dropped");
             });

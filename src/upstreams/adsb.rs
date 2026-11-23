@@ -73,7 +73,14 @@ pub struct AdsbUpstream {
 }
 
 impl UpstreamSource for AdsbUpstream {
-    fn poll(&self, agent: &ureq::Agent) -> Result<Vec<ProcessedApiData>, String> {
+    fn poll(
+        &self,
+        agent: &ureq::Agent,
+        api_calls: &super::ApiCallCounts,
+        endpoint: &str,
+    ) -> Result<Vec<ProcessedApiData>, String> {
+        api_calls.increment(endpoint);
+
         let feed: AdsbFeed = agent
             .get(&self.url)
             .call()

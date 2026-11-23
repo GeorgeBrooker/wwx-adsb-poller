@@ -8,8 +8,15 @@ pub struct AircraftAndCallsign {
     pub flightroute: Option<FlightRoute>
 }
 #[derive(Debug, Deserialize)]
+#[serde(untagged)]
+pub enum AdsbDbResponseValue {
+    Aircraft(AircraftAndCallsign),
+    Unknown(String),
+}
+
+#[derive(Debug, Deserialize)]
 pub struct AdsbDbResponse {
-    pub response: Option<AircraftAndCallsign>
+    pub response: Option<AdsbDbResponseValue>
 }
 #[derive(Debug, Deserialize)]
 pub struct FlightRoute {
@@ -17,10 +24,12 @@ pub struct FlightRoute {
     pub origin: Option<FlightOrigin>,
     pub destination: Option<FlightDestination>
 }
+/*
 #[derive(Debug, Deserialize)]
 pub struct IcaoAircraft {
     pub registration: Option<String>,
 }
+*/
 #[derive(Debug, Deserialize)]
 pub struct FlightOrigin{
     icao_code: Option<String>
@@ -66,15 +75,35 @@ pub struct IcaoUpstream {
 }
 
 impl UpstreamSource for IcaoUpstream {
-    fn poll(&self, agent: &ureq::Agent) -> Result<Vec<ProcessedApiData>, String> {
-        let envelope: AdsbDbResponse = agent
-            .get(&self.url)
-            .call()
-            .map_err(|e| e.to_string())?
+    fn poll(
+        &self,
+        agent: &ureq::Agent,
+        api_calls: &super::ApiCallCounts,
+        endpoint: &str,
+    ) -> Result<Vec<ProcessedApiData>, String> {
+        api_calls.increment(endpoint);
+
+        let response = match agent.get(&self.url).call() {
+            Ok(response) => response,
+            Err(ureq::Error::Status(_, response)) => response,
+            Err(error) => return Err(error.to_string()),
+        };
+
+        let envelope: AdsbDbResponse = response
             .into_json()
             .map_err(|e| e.to_string())?;
 
-        let icao_objet = envelope.response.and_then(Option::<ProcessedIcaoLookup>::from);
+        let icao_objet = match envelope.response {
+            Some(AdsbDbResponseValue::Aircraft(aircraft)) => {
+                Option::<ProcessedIcaoLookup>::from(aircraft)
+            }
+            Some(AdsbDbResponseValue::Unknown(message))
+                if message == "unknown callsign" => None,
+            Some(AdsbDbResponseValue::Unknown(message)) => {
+                return Err(format!("Unexpected ADSBDB response: {message}"));
+            }
+            None => None,
+        };
 
         // wrap into vector for API compatibility
         Ok(icao_objet

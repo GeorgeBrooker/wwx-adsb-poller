@@ -42,6 +42,7 @@ fn main() {
         icao_cache: RwLock::new(HashMap::new()),
         latest_data: RwLock::new(HashMap::new()),
         last_local_ping: RwLock::new(Instant::now()),
+        api_calls: crate::upstreams::ApiCallCounts::new()
     });
     let mut upstream_maps = HashMap::new();
 

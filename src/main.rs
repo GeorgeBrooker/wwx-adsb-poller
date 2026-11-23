@@ -15,8 +15,8 @@ mod local_server;
 struct Cli {
     #[command(flatten)]
     adsb: Option<AdsbArgs>,
-    #[arg(long, value_parser = clap::value_parser!(u64).range(1..=30), default_value_t=5)]
-    refresh_rate: u64,
+    #[arg(long, value_parser = clap::value_parser!(f64), default_value_t=5.0)]
+    refresh_rate: f64,
 }
 #[derive(Args, Debug)]
 #[group(requires_all = ["adsb_lat", "adsb_lon", "adsb_range"])]
@@ -34,7 +34,7 @@ fn main() {
     const ICAO_MISS_TTL: u64 = 2;
     let refresh_rate = args.refresh_rate.clone();
     let poll_timeout = 15; // seconds
-    let idle_timout = refresh_rate * 4; // server will kill itself after 4 missing polls
+    let idle_timout = refresh_rate * 4.0; // server will kill itself after 4 missing polls
     let local_server_address = "127.0.0.1:35535";
 
     // state will store the master table of collected api data
@@ -65,9 +65,9 @@ fn main() {
     spawn_poll_worker(
         state.clone(),
         upstream_maps,
-        Duration::from_mins(refresh_rate),
+        Duration::from_secs_f64(refresh_rate * 60.0),
         Duration::from_secs(poll_timeout),
-        Duration::from_mins(idle_timout),
+        Duration::from_secs_f64(idle_timout * 60.0),
         Duration::from_hours(ICAO_CACHE_TTL),
         Duration::from_hours(ICAO_MISS_TTL)
     );

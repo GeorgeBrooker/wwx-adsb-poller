@@ -65,7 +65,7 @@ fn build_airspace_request(state: &SharedState, removed_airports: &[String]) -> S
     )
 }
 
-fn build_heartbeat_json(state: &SharedState) -> String {
+fn build_heartbeat_lua(state: &SharedState) -> String {
     format!(
         "{{type={},status={},api_calls={{adsb={},icao={}}}}}",
         lua_string("heartbeat"),
@@ -122,7 +122,7 @@ pub fn serve(state: Arc<SharedState>, address: &str, removed_airports: &[String]
                 
                 match command {
                     "HEARTBEAT" => {
-                        let reply = build_heartbeat_json(&udp_state);
+                        let reply = build_heartbeat_lua(&udp_state);
                         let _ = socket.send_to(reply.as_bytes(), src_addr);
                     }
                     "AIRSPACE" => {
@@ -143,7 +143,7 @@ pub fn serve(state: Arc<SharedState>, address: &str, removed_airports: &[String]
         let command = request.url();
         match command {
             "/heartbeat" => {
-                let mut reply = Response::from_string(build_heartbeat_json(&state));
+                let mut reply = Response::from_string(build_heartbeat_lua(&state));
                 reply.add_header(
                     Header::from_bytes(
                         &b"Content-Type"[..],
